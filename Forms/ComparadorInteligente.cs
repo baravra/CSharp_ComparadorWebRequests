@@ -31,9 +31,10 @@ namespace ComparadorWebRequests
                     ? new HttpRequestContent(roboText)
                     : new HttpResponseContent(roboText);
 
-                var comparer = ContentComparerFactory.CreateComparer(tipoComparacao);
+                dynamic comparer = ContentComparerFactory.CreateComparer(tipoComparacao);
 
                 var resultado = comparer.Compare(portalContent, roboContent);
+
                 var resultForm = new ResultForm(resultado);
                 resultForm.ShowDialog();
 
