@@ -1,4 +1,8 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using ComparadorWebRequests.Utils;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Text.RegularExpressions;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
 {
@@ -17,70 +21,326 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
             }
         }
 
-        public List<ComparisonResult.LineComparison> Compare(string leftContent, string rightContent)
+        public List<ComparisonResult.LineComparison> Compare(string portalContent, string roboContent)
         {
-            var leftToken = JToken.Parse(leftContent);
-            var rightToken = JToken.Parse(rightContent);
+            var portalToken = JToken.Parse(portalContent);
+            var roboToken = JToken.Parse(roboContent);
 
-            var differences = new List<ComparisonResult.LineComparison>();
-            CompareTokens(string.Empty, leftToken, rightToken, differences);
-            return differences;
+            var results = new List<ComparisonResult.LineComparison>();
+            CompareToken(string.Empty, portalToken, roboToken, results);
+            return results;
         }
 
-        private void CompareTokens(string path, JToken left, JToken right, List<ComparisonResult.LineComparison> differences)
+        private void CompareToken(string path, JToken portalToken, JToken roboToken, List<ComparisonResult.LineComparison> results)
         {
-            if (JToken.DeepEquals(left, right)) return;
-
-            if (left.Type != right.Type)
+            if (portalToken.Type != roboToken.Type)
             {
-                differences.Add(new(path, left.ToString(), right.ToString(), ComparisonResult.LineStatus.Different));
+                results.Add(new(path, portalToken.ToString(), roboToken.ToString(), ComparisonResult.LineStatus.Different));
                 return;
             }
 
-            switch (left.Type)
+            switch (portalToken.Type)
             {
                 case JTokenType.Object:
-                    var allKeys = new HashSet<string>(
-                        ((JObject)left).Properties().Select(p => p.Name)
-                        .Union(((JObject)right).Properties().Select(p => p.Name))
-                    );
-
-                    foreach (var key in allKeys)
-                    {
-                        var lProp = ((JObject)left).Property(key);
-                        var rProp = ((JObject)right).Property(key);
-                        var newPath = string.IsNullOrEmpty(path) ? key : $"{path}.{key}";
-
-                        if (lProp == null)
-                            differences.Add(new(newPath, "", rProp?.Value.ToString(), ComparisonResult.LineStatus.MissingLeft));
-                        else if (rProp == null)
-                            differences.Add(new(newPath, lProp.Value.ToString(), "", ComparisonResult.LineStatus.MissingRight));
-                        else
-                            CompareTokens(newPath, lProp.Value, rProp.Value, differences);
-                    }
+                    CompareObjects(path, (JObject)portalToken, (JObject)roboToken, results);
                     break;
-
                 case JTokenType.Array:
-                    var lArr = left as JArray;
-                    var rArr = right as JArray;
-                    int maxLen = Math.Max(lArr.Count, rArr.Count);
-
-                    for (int i = 0; i < maxLen; i++)
-                    {
-                        var p = $"{path}[{i}]";
-                        if (i >= lArr.Count)
-                            differences.Add(new(p, "", rArr[i].ToString(), ComparisonResult.LineStatus.MissingLeft));
-                        else if (i >= rArr.Count)
-                            differences.Add(new(p, lArr[i].ToString(), "", ComparisonResult.LineStatus.MissingRight));
-                        else
-                            CompareTokens(p, lArr[i], rArr[i], differences);
-                    }
+                    CompareArrays(path, (JArray)portalToken, (JArray)roboToken, results);
                     break;
-
                 default:
-                    differences.Add(new(path, left.ToString(), right.ToString(), ComparisonResult.LineStatus.Different));
+                    CompareValues(path, portalToken, roboToken, results);
                     break;
             }
+        }
+
+        private void CompareObjects(string path, JObject portalObj, JObject roboObj, List<ComparisonResult.LineComparison> results)
+        {
+            var handledKeys = new HashSet<string>();
+
+            foreach (var portalProp in portalObj.Properties())
+            {
+                var fullPath = string.IsNullOrEmpty(path) ? portalProp.Name : $"{path}.{portalProp.Name}";
+
+                if (roboObj.TryGetValue(portalProp.Name, out JToken roboValue))
+                {
+                    handledKeys.Add(roboValue.ToString(Formatting.None));
+                    CompareToken(fullPath, portalProp.Value, roboValue, results);
+                }
+                else
+                {
+                    var bestMatch = ComparerUtils.FindBestMatch(
+                        roboObj.Properties(),
+                        portalProp,
+                        p => p.Name,
+                        p => p.Value.ToString(),
+                        handledKeys,
+                        0.95);
+
+                    if (bestMatch != null)
+                    {
+                        handledKeys.Add(bestMatch.Value.ToString(Formatting.None));
+                        AdicionarValorResult(fullPath, fullPath + ": " + portalProp.Value, fullPath + ": " + bestMatch.Value, ComparisonResult.LineStatus.Different, results);
+                    }
+                    else
+                    {
+                        AdicionarValorResult(fullPath, fullPath + ": " + portalProp.Value, "", ComparisonResult.LineStatus.MissingRight, results);
+                    }
+                }
+            }
+
+            // Verificar propriedades restantes do roboObj
+            foreach (var roboProp in roboObj.Properties())
+            {
+                string roboValueKey = roboProp.Value.ToString(Formatting.None);
+                if (handledKeys.Contains(roboValueKey)) continue;
+
+                var fullPath = string.IsNullOrEmpty(path) ? roboProp.Name : $"{path}.{roboProp.Name}";
+
+
+                var bestMatch = ComparerUtils.FindBestMatch(
+                    portalObj.Properties(),
+                    roboProp,
+                    p => p.Name,
+                    p => p.Value.ToString(),
+                    handledKeys,
+                    0.95);
+
+                if (bestMatch != null)
+                {
+                    handledKeys.Add(roboValueKey);
+                    AdicionarValorResult(fullPath, fullPath + ": " + bestMatch.Value, fullPath + ": " + roboProp.Value, ComparisonResult.LineStatus.Different, results);
+                }
+                else
+                {
+                    AdicionarValorResult(fullPath, "", fullPath + ": " + roboProp.Value, ComparisonResult.LineStatus.MissingLeft, results);
+                }
+            }
+        }
+
+        private void CompareArrays(string path, JArray portalArray, JArray roboArray, List<ComparisonResult.LineComparison> results)
+        {
+            bool isObjectArray = portalArray.All(t => t.Type == JTokenType.Object) && roboArray.All(t => t.Type == JTokenType.Object);
+
+            if (isObjectArray)
+            {
+                var unmatchedRoboItems = new List<JToken>(roboArray);
+                foreach (var portalItem in portalArray)
+                {
+                    var match = unmatchedRoboItems.FirstOrDefault(r => JToken.DeepEquals(r, portalItem));
+                    if (match != null)
+                    {
+                        unmatchedRoboItems.Remove(match);
+                        AdicionarValorResult(path, path + ": " + portalItem, path + ": " + match, ComparisonResult.LineStatus.Equal, results);
+                    }
+                    else
+                    {
+                        var similar = unmatchedRoboItems.FirstOrDefault(r => ComparerUtils.IsSimilar(r.ToString(), portalItem.ToString(), 0.9));
+                        if (similar != null)
+                        {
+                            unmatchedRoboItems.Remove(similar);
+                            AdicionarValorResult(path, path + ": " + portalItem, path + ": " + similar, ComparisonResult.LineStatus.Different, results);
+                        }
+                        else
+                        {
+                            AdicionarValorResult(path, path + ": " + portalItem, "", ComparisonResult.LineStatus.MissingRight, results);
+                        }
+                    }
+                }
+
+                foreach (var remaining in unmatchedRoboItems)
+                {
+                    AdicionarValorResult(path, "", path + ": " + remaining, ComparisonResult.LineStatus.MissingLeft, results);
+                }
+            }
+            else
+            {
+                int maxLength = Math.Max(portalArray.Count, roboArray.Count);
+                for (int i = 0; i < maxLength; i++)
+                {
+                    var itemPath = $"{path}[{i}]";
+
+                    if (i >= portalArray.Count)
+                    {
+                        AdicionarValorResult(itemPath, "", itemPath + ": " + roboArray[i], ComparisonResult.LineStatus.MissingLeft, results);
+                    }
+                    else if (i >= roboArray.Count)
+                    {
+                        AdicionarValorResult(itemPath, itemPath + ": " + portalArray[i], "", ComparisonResult.LineStatus.MissingRight, results);
+                    }
+                    else
+                    {
+                        if (JToken.DeepEquals(portalArray[i], roboArray[i]))
+                        {
+                            AdicionarValorResult(itemPath, itemPath + ": " + portalArray[i], itemPath + ": " + roboArray[i], ComparisonResult.LineStatus.Equal, results);
+                        }
+                        else if (ComparerUtils.IsSimilar(portalArray[i].ToString(), roboArray[i].ToString(), 0.9))
+                        {
+                            AdicionarValorResult(itemPath, itemPath + ": " + portalArray[i], itemPath + ": " + roboArray[i], ComparisonResult.LineStatus.Different, results);
+                        }
+                        else
+                        {
+                            CompareToken(itemPath, portalArray[i], roboArray[i], results);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void CompareValues(string path, JToken portalValue, JToken roboValue, List<ComparisonResult.LineComparison> results)
+        {
+            var status = JToken.DeepEquals(portalValue, roboValue)
+                    ? ComparisonResult.LineStatus.Equal
+                    : (ComparerUtils.IsSimilar(portalValue.ToString(), roboValue.ToString(), 0.9) ? ComparisonResult.LineStatus.Different : ComparisonResult.LineStatus.Different);
+
+            AdicionarValorResult(
+                path,
+                path + ": " + portalValue.ToString(),
+                path + ": " + roboValue.ToString(),
+                status,
+                results
+            );
+        }
+
+        /*private void CompareObjects_bkp(string path, JObject portalObj, JObject roboObj, List<ComparisonResult.LineComparison> results)
+        {
+            var allKeys = new HashSet<string>(portalObj.Properties().Select(p => p.Name)
+                .Union(roboObj.Properties().Select(p => p.Name)));
+
+            foreach (var key in allKeys)
+            {
+                var fullPath = string.IsNullOrEmpty(path) ? key : $"{path}.{key}";
+                var portalProp = portalObj.Property(key);
+                var roboProp = roboObj.Property(key);
+
+                if (portalProp == null)
+                {
+                    AdicionarValorResult(
+                        fullPath
+                        , ""
+                        , fullPath + ": " + roboProp?.Value.ToString()
+                        , ComparisonResult.LineStatus.MissingLeft
+                        , results
+                    );
+                }
+                else if (roboProp == null)
+                {
+                    AdicionarValorResult(
+                        fullPath
+                        , fullPath + ": " + portalProp.Value.ToString()
+                        , ""
+                        , ComparisonResult.LineStatus.MissingRight
+                        , results
+                    );
+                }
+                else
+                {
+                    CompareToken(fullPath, portalProp.Value, roboProp.Value, results);
+                }
+            }
+        }
+
+        private void CompareArrays_bkp(string path, JArray portalArray, JArray roboArray, List<ComparisonResult.LineComparison> results)
+        {
+            bool isObjectArray = portalArray.All(t => t.Type == JTokenType.Object) && roboArray.All(t => t.Type == JTokenType.Object);
+
+            if (isObjectArray)
+            {
+                var unmatchedRoboItems = new List<JToken>(roboArray);
+                foreach (var portalItem in portalArray)
+                {
+                    var match = unmatchedRoboItems.FirstOrDefault(r => JToken.DeepEquals(r, portalItem));
+                    if (match != null)
+                    {
+                        unmatchedRoboItems.Remove(match);
+                        AdicionarValorResult(
+                            path
+                            , path + ": " + portalItem.ToString()
+                            , path + ": " + match.ToString()
+                            , ComparisonResult.LineStatus.Equal
+                            , results
+                        );
+                    }
+                    else
+                    {
+                        AdicionarValorResult(
+                            path
+                            , path + ": " + portalItem.ToString()
+                            , ""
+                            , ComparisonResult.LineStatus.MissingRight
+                            , results
+                        );
+                    }
+                }
+
+                foreach (var remaining in unmatchedRoboItems)
+                {
+                    AdicionarValorResult(
+                        path
+                        , ""
+                        , path + ": " + remaining.ToString()
+                        , ComparisonResult.LineStatus.MissingLeft
+                        , results
+                    );
+                }
+            }
+            else
+            {
+                int maxLength = Math.Max(portalArray.Count, roboArray.Count);
+                for (int i = 0; i < maxLength; i++)
+                {
+                    var itemPath = $"{path}[{i}]";
+
+                    if (i >= portalArray.Count)
+                    {
+                        AdicionarValorResult(
+                            itemPath
+                            , ""
+                            , itemPath + ": " + roboArray[i].ToString()
+                            , ComparisonResult.LineStatus.MissingLeft
+                            , results
+                        );
+                    }
+                    else if (i >= roboArray.Count)
+                    {
+                        AdicionarValorResult(
+                            itemPath
+                            , itemPath + ": " + portalArray[i].ToString()
+                            , ""
+                            , ComparisonResult.LineStatus.MissingRight
+                            , results
+                        );
+                    }
+                    else
+                    {
+                        CompareToken(itemPath, portalArray[i], roboArray[i], results);
+                    }
+                }
+            }
+        }
+
+        private void CompareValues_bkp(string path, JToken portalValue, JToken roboValue, List<ComparisonResult.LineComparison> results)
+        {
+            var status = JToken.DeepEquals(portalValue, roboValue)
+                    ? ComparisonResult.LineStatus.Equal
+                    : ComparisonResult.LineStatus.Different;
+
+            AdicionarValorResult(
+                path
+                , path + ": " + portalValue.ToString()
+                , path + ": " + roboValue.ToString()
+                , status
+                , results
+            );
+        }*/
+
+        private void AdicionarValorResult(string path, string portalValue, string roboValue, ComparisonResult.LineStatus status, List<ComparisonResult.LineComparison> results)
+        {
+            results.Add(new
+                (path
+                , portalValue.Replace("\r\n", "")
+                , roboValue.Replace("\r\n", "")
+                , status
+            ));
         }
     }
 }

@@ -11,7 +11,7 @@ namespace ComparadorWebRequests.Logic.Comparison
     {
         // IContentComparer.cs → Interface para classes comparadoras
         bool CanCompare(string content);
-        List<ComparisonResult.LineComparison> Compare(string leftContent, string rightContent);
+        List<ComparisonResult.LineComparison> Compare(string portalContent, string roboContent);
 
     }
 }

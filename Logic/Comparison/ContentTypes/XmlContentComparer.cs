@@ -22,42 +22,42 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
             }
         }
 
-        public List<ComparisonResult.LineComparison> Compare(string leftContent, string rightContent)
+        public List<ComparisonResult.LineComparison> Compare(string portalContent, string roboContent)
         {
-            var left = XDocument.Parse(leftContent).Root;
-            var right = XDocument.Parse(rightContent).Root;
+            var portal = XDocument.Parse(portalContent).Root;
+            var robo = XDocument.Parse(roboContent).Root;
             var differences = new List<ComparisonResult.LineComparison>();
-            CompareElements("", left, right, differences);
+            CompareElements("", portal, robo, differences);
             return differences;
         }
 
-        private void CompareElements(string path, XElement left, XElement right, List<ComparisonResult.LineComparison> diffs)
+        private void CompareElements(string path, XElement portal, XElement robo, List<ComparisonResult.LineComparison> diffs)
         {
-            if (left == null && right == null) return;
+            if (portal == null && robo == null) return;
 
-            string currentPath = string.IsNullOrEmpty(path) ? left?.Name.LocalName ?? right?.Name.LocalName : $"{path}/{left?.Name.LocalName ?? right?.Name.LocalName}";
+            string currentPath = string.IsNullOrEmpty(path) ? portal?.Name.LocalName ?? robo?.Name.LocalName : $"{path}/{portal?.Name.LocalName ?? robo?.Name.LocalName}";
 
-            if (left == null)
+            if (portal == null)
             {
-                diffs.Add(new(currentPath, "", right.ToString(), ComparisonResult.LineStatus.MissingLeft));
+                diffs.Add(new(currentPath, "", robo.ToString(), ComparisonResult.LineStatus.MissingLeft));
                 return;
             }
 
-            if (right == null)
+            if (robo == null)
             {
-                diffs.Add(new(currentPath, left.ToString(), "", ComparisonResult.LineStatus.MissingRight));
+                diffs.Add(new(currentPath, portal.ToString(), "", ComparisonResult.LineStatus.MissingRight));
                 return;
             }
 
-            if (left.Name != right.Name)
+            if (portal.Name != robo.Name)
             {
-                diffs.Add(new(currentPath, left.ToString(), right.ToString(), ComparisonResult.LineStatus.Different));
+                diffs.Add(new(currentPath, portal.ToString(), robo.ToString(), ComparisonResult.LineStatus.Different));
                 return;
             }
 
             // Atributos
-            var lAttr = left.Attributes().ToDictionary(a => a.Name, a => a.Value);
-            var rAttr = right.Attributes().ToDictionary(a => a.Name, a => a.Value);
+            var lAttr = portal.Attributes().ToDictionary(a => a.Name, a => a.Value);
+            var rAttr = robo.Attributes().ToDictionary(a => a.Name, a => a.Value);
             var allAttr = new HashSet<XName>(lAttr.Keys.Concat(rAttr.Keys));
 
             foreach (var attr in allAttr)
@@ -70,12 +70,12 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
             }
 
             // Conteúdo textual
-            if (left.Value != right.Value)
-                diffs.Add(new($"{currentPath}/text()", left.Value, right.Value, ComparisonResult.LineStatus.Different));
+            if (portal.Value != robo.Value)
+                diffs.Add(new($"{currentPath}/text()", portal.Value, robo.Value, ComparisonResult.LineStatus.Different));
 
             // Elementos filhos
-            var lChildren = left.Elements().ToList();
-            var rChildren = right.Elements().ToList();
+            var lChildren = portal.Elements().ToList();
+            var rChildren = robo.Elements().ToList();
             int count = Math.Max(lChildren.Count, rChildren.Count);
 
             for (int i = 0; i < count; i++)

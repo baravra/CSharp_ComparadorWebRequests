@@ -16,13 +16,13 @@ namespace ComparadorWebRequests.Logic.Comparison
             {
                 var result = new ComparisonResult();
 
-                var leftLines = portalContent.GetNormalizedLines();
-                var rightLines = roboContent.GetNormalizedLines();
+                var linhasPortal = portalContent.GetNormalizedLines();
+                var linhasRobo = roboContent.GetNormalizedLines();
 
-                string leftBody = string.Join("\n", ExtractBodyLines(leftLines));
-                string rightBody = string.Join("\n", ExtractBodyLines(rightLines));
+                string bodyPortal = string.Join("\n", ExtractBodyLines(linhasPortal));
+                string bodyRobo = string.Join("\n", ExtractBodyLines(linhasRobo));
 
-                var bodyDifferences = _contentComparer.Compare(leftBody, rightBody);
+                var bodyDifferences = _contentComparer.Compare(bodyPortal, bodyRobo);
                 result.Results.AddRange(bodyDifferences);
 
                 return result;

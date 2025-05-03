@@ -22,12 +22,12 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
             }
         }
 
-        public List<ComparisonResult.LineComparison> Compare(string leftContent, string rightContent)
+        public List<ComparisonResult.LineComparison> Compare(string portalContent, string roboContent)
         {
             var lDoc = new HtmlDocument();
             var rDoc = new HtmlDocument();
-            lDoc.LoadHtml(leftContent);
-            rDoc.LoadHtml(rightContent);
+            lDoc.LoadHtml(portalContent);
+            rDoc.LoadHtml(roboContent);
 
             var diffs = new List<ComparisonResult.LineComparison>();
             CompareNodes("/", lDoc.DocumentNode, rDoc.DocumentNode, diffs);

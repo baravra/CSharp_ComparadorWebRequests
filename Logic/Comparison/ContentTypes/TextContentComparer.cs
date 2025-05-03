@@ -10,10 +10,10 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
     {
         public bool CanCompare(string content) => true;
 
-        public List<ComparisonResult.LineComparison> Compare(string left, string right)
+        public List<ComparisonResult.LineComparison> Compare(string portal, string robo)
         {
-            var lines1 = left.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            var lines2 = right.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var lines1 = portal.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var lines2 = robo.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
 
             var results = new List<ComparisonResult.LineComparison>();
             int max = Math.Max(lines1.Length, lines2.Length);

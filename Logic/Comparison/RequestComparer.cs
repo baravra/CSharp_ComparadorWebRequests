@@ -1,9 +1,5 @@
 ﻿using ComparadorWebRequests.Logic.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ComparadorWebRequests.Utils;
 
 namespace ComparadorWebRequests.Logic.Comparison
 {
@@ -33,7 +29,7 @@ namespace ComparadorWebRequests.Logic.Comparison
                 }
                 else if (existeLinhaNoPortal)
                 {
-                    var similarRobo = linhasRobo.FirstOrDefault(r => IsSimilar(r, line));
+                    var similarRobo = linhasRobo.FirstOrDefault(r => ComparerUtils.IsSimilar(r, line));
 
                     if (similarRobo != null)
                         result.Results.Add(new ComparisonResult.LineComparison("", line, similarRobo, ComparisonResult.LineStatus.Different));
@@ -42,7 +38,7 @@ namespace ComparadorWebRequests.Logic.Comparison
                 }
                 else if (existeLinhaNoRobo)
                 {
-                    var similarPortal = linhasPortal.FirstOrDefault(l => IsSimilar(l, line));
+                    var similarPortal = linhasPortal.FirstOrDefault(l => ComparerUtils.IsSimilar(l, line));
 
                     if (similarPortal != null)
                         result.Results.Add(new ComparisonResult.LineComparison("", similarPortal, line, ComparisonResult.LineStatus.Different));
@@ -55,41 +51,6 @@ namespace ComparadorWebRequests.Logic.Comparison
             return result;
         }
 
-        private bool IsSimilar(string a, string b)
-        {
-            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
-            int distance = LevenshteinDistance(a, b);
-            double similarity = 1.0 - ((double)distance / Math.Max(a.Length, b.Length));
-            return similarity > 0.75; // se tiver uma similaridade de pelo menos 75% será considerado que é diferente invés de faltando
-        }
-
-        /* Detectar semelhanças "parciais" entre linhas de texto — mesmo que não sejam idênticas
-         * Calcula a Distância de Levenshtein entre duas strings
-         * Métrica de similaridade que mede quantas operações mínimas são necessárias para transformar uma string na outra
-         */
-        private int LevenshteinDistance(string s, string t)
-        {
-            int n = s.Length;
-            int m = t.Length;
-            var d = new int[n + 1, m + 1];
-
-            for (int i = 0; i <= n; d[i, 0] = i++) ;
-            for (int j = 0; j <= m; d[0, j] = j++) ;
-
-            for (int i = 1; i <= n; i++)
-            {
-                for (int j = 1; j <= m; j++)
-                {
-                    int cost = s[i - 1] == t[j - 1] ? 0 : 1;
-                    d[i, j] = Math.Min(Math.Min(
-                        d[i - 1, j] + 1,
-                        d[i, j - 1] + 1),
-                        d[i - 1, j - 1] + cost);
-                }
-            }
-
-            return d[n, m];
-        }
 
     }
 }

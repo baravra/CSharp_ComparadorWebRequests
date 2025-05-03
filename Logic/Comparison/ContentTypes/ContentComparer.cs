@@ -1,18 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
+﻿namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
 {
     public class ContentComparer
     {
-        private readonly List<IContentComparer> _comparers;
+        private readonly List<IContentComparer> _contentComparers;
 
         public ContentComparer()
         {
-            _comparers = new List<IContentComparer>
+            _contentComparers = new List<IContentComparer>
             {
                 new JsonContentComparer(),
                 new XmlContentComparer(),
@@ -21,18 +15,18 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
             };
         }
 
-        public List<ComparisonResult.LineComparison> Compare(string leftContent, string rightContent)
+        public List<ComparisonResult.LineComparison> Compare(string portalContent, string roboContent)
         {
-            foreach (var comparer in _comparers)
+            foreach (var comparer in _contentComparers) // identificar automaticamente o type do body
             {
-                if (comparer.CanCompare(leftContent) && comparer.CanCompare(rightContent))
+                if (comparer.CanCompare(portalContent) && comparer.CanCompare(roboContent))
                 {
-                    return comparer.Compare(leftContent, rightContent);
+                    return comparer.Compare(portalContent, roboContent);
                 }
             }
 
             // Fallback para texto
-            return new TextContentComparer().Compare(leftContent, rightContent);
+            return new TextContentComparer().Compare(portalContent, roboContent);
         }
     }
 }
