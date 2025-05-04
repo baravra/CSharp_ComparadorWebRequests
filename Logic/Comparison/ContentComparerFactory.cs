@@ -13,14 +13,16 @@ namespace ComparadorWebRequests.Logic.Comparison
             Request,
             Response
         }
+        public static RequestComparer CreateRequestComparer() => new RequestComparer();
+        public static ResponseComparer CreateResponseComparer() => new ResponseComparer();
 
-        public static IContentComparer CreateComparer(ComparisonType type)
+        public static object CreateComparer(ComparisonType type)
         {
             return type switch
             {
-                ComparisonType.Request => new RequestComparer(),
-                ComparisonType.Response => new ResponseComparer(),
-                _ => throw new NotSupportedException("Tipo de comparação não suportado")
+                ComparisonType.Request => CreateRequestComparer(),
+                ComparisonType.Response => CreateResponseComparer(),
+                _ => throw new ArgumentOutOfRangeException()
             };
         }
     }

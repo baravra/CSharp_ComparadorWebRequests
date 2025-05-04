@@ -36,6 +36,7 @@
             txtDifferences.Dock = DockStyle.Fill;
             txtDifferences.Location = new Point(0, 0);
             txtDifferences.Name = "txtDifferences";
+            txtDifferences.ReadOnly = true;
             txtDifferences.Size = new Size(800, 450);
             txtDifferences.TabIndex = 0;
             txtDifferences.Text = "";

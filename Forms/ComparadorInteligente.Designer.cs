@@ -45,6 +45,7 @@
             txtPortal.Location = new Point(17, 49);
             txtPortal.Multiline = true;
             txtPortal.Name = "txtPortal";
+            txtPortal.ScrollBars = ScrollBars.Vertical;
             txtPortal.Size = new Size(498, 497);
             txtPortal.TabIndex = 0;
             // 
@@ -72,6 +73,7 @@
             txtRobo.Location = new Point(549, 49);
             txtRobo.Multiline = true;
             txtRobo.Name = "txtRobo";
+            txtRobo.ScrollBars = ScrollBars.Vertical;
             txtRobo.Size = new Size(498, 497);
             txtRobo.TabIndex = 2;
             // 

@@ -12,7 +12,8 @@ namespace ComparadorWebRequests.Logic.Comparison
             MissingLeft,
             MissingRight
         }
-        public record LineComparison(string LineLeft, string LineRight, LineStatus Status);
+        public record LineComparison(string Path, string LineLeft, string LineRight, LineStatus Status);
+
         public List<LineComparison> Results { get; set; } = new();
 
         public override string ToString()
