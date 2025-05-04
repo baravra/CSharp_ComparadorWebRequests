@@ -76,10 +76,10 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
                         handledKeys,
                         0.95);
 
-                    if (bestMatch != null)
+                    if (bestMatch.Item != null)
                     {
-                        handledKeys.Add(bestMatch.Value.ToString(Formatting.None));
-                        AdicionarValorResult(fullPath, fullPath + ": " + portalProp.Value, fullPath + ": " + bestMatch.Value, ComparisonResult.LineStatus.Different, results);
+                        handledKeys.Add(bestMatch.Item.Value.ToString(Formatting.None));
+                        AdicionarValorResult(fullPath, fullPath + ": " + portalProp.Value, fullPath + ": " + bestMatch.Item.Value, ComparisonResult.LineStatus.Different, results);
                     }
                     else
                     {
@@ -105,10 +105,10 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
                     handledKeys,
                     0.95);
 
-                if (bestMatch != null)
+                if (bestMatch.Item != null)
                 {
                     handledKeys.Add(roboValueKey);
-                    AdicionarValorResult(fullPath, fullPath + ": " + bestMatch.Value, fullPath + ": " + roboProp.Value, ComparisonResult.LineStatus.Different, results);
+                    AdicionarValorResult(fullPath, fullPath + ": " + bestMatch.Item.Value, fullPath + ": " + roboProp.Value, ComparisonResult.LineStatus.Different, results);
                 }
                 else
                 {
@@ -119,69 +119,53 @@ namespace ComparadorWebRequests.Logic.Comparison.ContentTypes
 
         private void CompareArrays(string path, JArray portalArray, JArray roboArray, List<ComparisonResult.LineComparison> results)
         {
-            bool isObjectArray = portalArray.All(t => t.Type == JTokenType.Object) && roboArray.All(t => t.Type == JTokenType.Object);
-
-            if (isObjectArray)
+            var handledRoboItems = new HashSet<string>();
+            foreach (var portalItem in portalArray)
             {
-                var unmatchedRoboItems = new List<JToken>(roboArray);
-                foreach (var portalItem in portalArray)
+                string serializedPortalItem = portalItem.ToString(Formatting.None);
+
+                var exactMatch = roboArray.FirstOrDefault(roboItem =>
+                    !handledRoboItems.Contains(roboItem.ToString(Formatting.None)) &&
+                    JToken.DeepEquals(portalItem, roboItem));
+
+                string fullPath = $"{path}[]";
+
+                if (exactMatch != null)
                 {
-                    var match = unmatchedRoboItems.FirstOrDefault(r => JToken.DeepEquals(r, portalItem));
-                    if (match != null)
+                    handledRoboItems.Add(exactMatch.ToString(Formatting.None));
+                    AdicionarValorResult(fullPath, portalItem.ToString(), exactMatch.ToString(), ComparisonResult.LineStatus.Equal, results);
+                }
+                else
+                {
+                    // Buscar melhor similaridade se não achar um DeepEquals
+                    var bestMatch = ComparerUtils.FindBestMatch(
+                        roboArray,
+                        portalItem,
+                        t => "",
+                        t => t.ToString(Formatting.None),
+                        handledRoboItems,
+                        0.7);
+
+                    if (bestMatch.Item != null)
                     {
-                        unmatchedRoboItems.Remove(match);
-                        AdicionarValorResult(path, path + ": " + portalItem, path + ": " + match, ComparisonResult.LineStatus.Equal, results);
+                        handledRoboItems.Add(bestMatch.Item.ToString(Formatting.None));
+                        AdicionarValorResult(fullPath, portalItem.ToString(), bestMatch.Item.ToString(), ComparisonResult.LineStatus.Different, results);
                     }
                     else
                     {
-                        var similar = unmatchedRoboItems.FirstOrDefault(r => ComparerUtils.IsSimilar(r.ToString(), portalItem.ToString(), 0.9));
-                        if (similar != null)
-                        {
-                            unmatchedRoboItems.Remove(similar);
-                            AdicionarValorResult(path, path + ": " + portalItem, path + ": " + similar, ComparisonResult.LineStatus.Different, results);
-                        }
-                        else
-                        {
-                            AdicionarValorResult(path, path + ": " + portalItem, "", ComparisonResult.LineStatus.MissingRight, results);
-                        }
+                        AdicionarValorResult(fullPath, portalItem.ToString(), "", ComparisonResult.LineStatus.MissingRight, results);
                     }
-                }
-
-                foreach (var remaining in unmatchedRoboItems)
-                {
-                    AdicionarValorResult(path, "", path + ": " + remaining, ComparisonResult.LineStatus.MissingLeft, results);
                 }
             }
-            else
-            {
-                int maxLength = Math.Max(portalArray.Count, roboArray.Count);
-                for (int i = 0; i < maxLength; i++)
-                {
-                    var itemPath = $"{path}[{i}]";
 
-                    if (i >= portalArray.Count)
-                    {
-                        AdicionarValorResult(itemPath, "", itemPath + ": " + roboArray[i], ComparisonResult.LineStatus.MissingLeft, results);
-                    }
-                    else if (i >= roboArray.Count)
-                    {
-                        AdicionarValorResult(itemPath, itemPath + ": " + portalArray[i], "", ComparisonResult.LineStatus.MissingRight, results);
-                    }
-                    else
-                    {
-                        if (JToken.DeepEquals(portalArray[i], roboArray[i]))
-                        {
-                            AdicionarValorResult(itemPath, itemPath + ": " + portalArray[i], itemPath + ": " + roboArray[i], ComparisonResult.LineStatus.Equal, results);
-                        }
-                        else if (ComparerUtils.IsSimilar(portalArray[i].ToString(), roboArray[i].ToString(), 0.9))
-                        {
-                            AdicionarValorResult(itemPath, itemPath + ": " + portalArray[i], itemPath + ": " + roboArray[i], ComparisonResult.LineStatus.Different, results);
-                        }
-                        else
-                        {
-                            CompareToken(itemPath, portalArray[i], roboArray[i], results);
-                        }
-                    }
+            // Agora procura os itens restantes do robo que não foram casados
+            foreach (var roboItem in roboArray)
+            {
+                string roboSerialized = roboItem.ToString(Formatting.None);
+                if (!handledRoboItems.Contains(roboSerialized))
+                {
+                    string fullPath = $"{path}[]";
+                    AdicionarValorResult(fullPath, "", roboSerialized, ComparisonResult.LineStatus.MissingLeft, results);
                 }
             }
         }

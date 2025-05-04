@@ -52,53 +52,31 @@ namespace ComparadorWebRequests.Utils
             return d[n, m];
         }
 
-        public static T? FindBestMatch<T>(
-            IEnumerable<T> source,
-            T target,
-            Func<T, string> getKey,
-            Func<T, string> getValue,
-            HashSet<string> handledKeys,
-            double threshold = 0.75) 
-            where T : class // (se os itens forem todos classes)
+        public static (T? Item, double Similarity) FindBestMatch<T>(
+        IEnumerable<T> source,
+        T target,
+        Func<T, string> getKey,
+        Func<T, string> getValue,
+        HashSet<string> handledKeys,
+        double threshold = 0.75)
+        where T : class
         {
-            return source
+            var bestMatch = source
                 .Where(item => !handledKeys.Contains(getKey(item)))
-                .Select(item => new
+                .Select(item =>
                 {
-                    Item = item,
-                    NameSimilarity = ComparerUtils.SimilarityScore(getKey(item), getKey(target)),
-                    ValueSimilarity = ComparerUtils.SimilarityScore(getValue(item), getValue(target))
+                    double nameSim = SimilarityScore(getKey(item), getKey(target));
+                    double valueSim = SimilarityScore(getValue(item), getValue(target));
+                    double totalSim = (nameSim + valueSim) / 2.0;
+                    return new { Item = item, Similarity = totalSim };
                 })
-                .Select(match => new
-                {
-                    match.Item,
-                    TotalScore = (match.NameSimilarity + match.ValueSimilarity) / 2.0
-                })
-                .Where(match => match.TotalScore >= threshold)
-                .OrderByDescending(match => match.TotalScore)
-                .FirstOrDefault()?.Item ?? default;
+                .Where(match => match.Similarity >= threshold)
+                .OrderByDescending(match => match.Similarity)
+                .FirstOrDefault();
 
-
-            /* Como implementar
-                JSON 
-                        var match = ComparerUtils.FindBestMatch(
-                roboObj.Properties(),
-                portalProp,
-                p => p.Name,
-                p => p.Value.ToString(),
-                handledKeys
-            );
-
-                        xml
-                        var match = ComparerUtils.FindBestMatch(
-                xmlElements,
-                targetElement,
-                e => e.Name.LocalName,
-                e => e.Value,
-                handledKeys
-            );
-        
-            */
+            return bestMatch != null
+                ? (bestMatch.Item, bestMatch.Similarity)
+                : (null, 0.0);
         }
 
 
